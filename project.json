@@ -158,39 +158,39 @@
     {
       "name": "Web app",
       "goal": "A Next.js front end for every flow, started together with the API by one command.",
-      "status": "doing",
+      "status": "done",
       "steps": [
         {
           "text": "Create the Next.js app and the streaming proxy route to the API",
-          "done": false
+          "done": true
         },
         {
           "text": "Build the landing page and the sign-in and sign-up pages",
-          "done": false
+          "done": true
         },
         {
           "text": "Build the chat workspace: history sidebar, streamed messages, stop button, usage meter",
-          "done": false
+          "done": true
         },
         {
           "text": "Build the account page and the admin page with the usage chart",
-          "done": false
+          "done": true
         },
         {
           "text": "Write the one-command start script and unit tests for the stream parser",
-          "done": false
+          "done": true
         },
         {
           "text": "Run a browser test of the whole flow and take screenshots",
-          "done": false
+          "done": true
         }
       ],
-      "outcome": ""
+      "outcome": "A Next.js app with a landing page, sign-in and sign-up, the chat workspace with streamed answers and a stop button, an account page and an admin page with a usage chart. ./dev.sh installs, seeds and starts both servers. A browser test walks through every flow and passes."
     },
     {
       "name": "Verification and docs",
       "goal": "Measured results, a live model check, and documentation a client can follow.",
-      "status": "todo",
+      "status": "doing",
       "steps": [
         {
           "text": "Run the full test suite offline and record the result",
