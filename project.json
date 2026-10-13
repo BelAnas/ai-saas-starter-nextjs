@@ -5,9 +5,9 @@
   "title": "Full-stack AI SaaS app (Next.js + FastAPI)",
   "tagline": "A small but complete AI product: sign-in, per-user usage limits, streamed answers, saved history and an admin usage page, with a Next.js front end and a Python API.",
   "category": "Full-stack AI",
-  "status": "building",
+  "status": "done",
   "started": "2026-10-13",
-  "finished": "",
+  "finished": "2026-10-13",
   "pitch": "I built a complete AI product, not just a chat box. People sign up, each plan has a daily limit that the server enforces, answers appear word by word, every conversation is saved, and the owner has a page that shows who used what and what it cost. It runs on your laptop with one command and no API key, and the same code talks to OpenAI or a local model by changing one setting.",
   "problem": "A founder who wants to sell an AI feature needs much more than a call to a model. Without accounts, usage limits and cost tracking, one heavy user can spend the whole month's model budget in a day, and nobody can say which customers are profitable. Most demos skip exactly these parts.",
   "solution": "Shopdesk AI is a writing assistant for small online shops, used here as the example product. A Next.js web app talks to a FastAPI server. The server keeps accounts, sessions, conversations and one usage record per request in a database. Before a request reaches the model the server reserves a place in the user's daily allowance, then it streams the answer to the browser and records the tokens and the estimated cost. An admin page reads the same usage records.",
@@ -44,10 +44,73 @@
       "name": "Tailwind CSS",
       "role": "Styles the pages.",
       "why": "It is the styling tool most Next.js clients already use."
+    },
+    {
+      "name": "httpx",
+      "role": "Calls the model provider's chat API and reads its stream.",
+      "why": "Talking to the HTTP protocol directly avoids a vendor SDK and works with every OpenAI-compatible server."
+    },
+    {
+      "name": "pytest, Vitest and Playwright",
+      "role": "API tests, front-end unit tests and a browser test of the whole product.",
+      "why": "Each level catches different mistakes: logic, parsing, and the real behaviour in a browser."
     }
   ],
-  "keywords": [],
-  "topics": [],
+  "keywords": [
+    "Next.js",
+    "React",
+    "TypeScript",
+    "FastAPI",
+    "Python",
+    "SaaS",
+    "MVP",
+    "full stack",
+    "AI SaaS starter",
+    "boilerplate",
+    "authentication",
+    "login",
+    "sessions",
+    "usage limits",
+    "quota",
+    "rate limiting",
+    "metering",
+    "token usage",
+    "cost tracking",
+    "streaming",
+    "Server-Sent Events",
+    "SSE",
+    "ChatGPT-like app",
+    "chat history",
+    "admin dashboard",
+    "subscription plans",
+    "free and pro tiers",
+    "OpenAI",
+    "Ollama",
+    "Tailwind CSS",
+    "SQLite",
+    "SQLAlchemy",
+    "Supabase alternative",
+    "backend for frontend",
+    "proxy"
+  ],
+  "topics": [
+    "nextjs",
+    "fastapi",
+    "saas",
+    "ai-saas",
+    "typescript",
+    "python",
+    "llm",
+    "openai",
+    "server-sent-events",
+    "streaming",
+    "rate-limiting",
+    "usage-metering",
+    "authentication",
+    "tailwindcss",
+    "sqlalchemy",
+    "starter-template"
+  ],
   "workflow": [
     {
       "step": "Sign in",
@@ -190,43 +253,464 @@
     {
       "name": "Verification and docs",
       "goal": "Measured results, a live model check, and documentation a client can follow.",
-      "status": "doing",
+      "status": "done",
       "steps": [
         {
           "text": "Run the full test suite offline and record the result",
-          "done": false
+          "done": true
         },
         {
           "text": "Run the streaming benchmark, directly and through the Next.js proxy",
-          "done": false
+          "done": true
         },
         {
           "text": "Run the live check against a real model and record the cost",
-          "done": false
+          "done": true
         },
         {
           "text": "Run the project from a clean clone the way the README says",
-          "done": false
+          "done": true
         },
         {
           "text": "Write the README and complete the dashboard entry",
-          "done": false
+          "done": true
         }
       ],
-      "outcome": ""
+      "outcome": "37 API tests and 5 front-end tests pass offline. The streaming benchmark, the browser test and a live check against a local model were run and their numbers are in the README. The project was cloned into an empty folder and started with ./dev.sh, and the browser test passed there too."
     }
   ],
-  "decisions": [],
-  "results": [],
-  "client_qa": [],
-  "concepts": [],
-  "limits": [],
-  "run": [],
-  "files": [],
+  "decisions": [
+    {
+      "title": "How to stop two requests from taking the same last slot",
+      "chosen": "Reserve the slot inside one database transaction that takes the write lock first (BEGIN IMMEDIATE in SQLite): count today's usage, then insert a usage record with the state started.",
+      "why": "A limit that is checked and recorded in two separate steps can be beaten by sending many requests at once. With the lock, the count and the insert are one step. A test fires 50 requests at once against a limit of 20 and exactly 20 are served. When I removed the lock during this build, the same test failed.",
+      "alternatives": [
+        {
+          "option": "Count first, record after the answer",
+          "why_not": "All parallel requests see the same count and all pass. This is the usual bug in usage limits."
+        },
+        {
+          "option": "A counter in Redis",
+          "why_not": "Fast and correct, but it adds a second system to run and a second source of numbers that can drift from the usage records used for billing."
+        },
+        {
+          "option": "A counter in the API's memory",
+          "why_not": "It is lost on restart and is wrong as soon as there are two API processes."
+        }
+      ],
+      "at_scale": "On PostgreSQL the same idea becomes a row lock on the user (SELECT ... FOR UPDATE) so that different users do not wait for each other. At very high volume a Redis counter is put in front and the database stays the record for billing."
+    },
+    {
+      "title": "Where sessions live",
+      "chosen": "A random token in an httpOnly, SameSite=Lax cookie. The database stores only a hash of the token.",
+      "why": "The session can be ended at once by deleting one row, which is what sign-out and account deactivation do. JavaScript in the page cannot read the cookie, and a leaked database does not contain usable tokens.",
+      "alternatives": [
+        {
+          "option": "JWT tokens",
+          "why_not": "A signed token stays valid until it expires. Ending it early needs a block list, which is a session table again."
+        },
+        {
+          "option": "A hosted service such as Clerk, Auth0 or Supabase Auth",
+          "why_not": "Good for production, but a stranger could not run the project without creating an account and keys."
+        },
+        {
+          "option": "A token in localStorage",
+          "why_not": "Any script injected in the page could read it and send it away."
+        }
+      ],
+      "at_scale": "I would usually plug in the client's identity provider (Google sign-in, Supabase Auth, Clerk) and keep this session table or replace it with the provider's sessions. Email verification and password reset must be added."
+    },
+    {
+      "title": "How the browser reaches the Python API",
+      "chosen": "Through a small proxy route in the Next.js server. The browser only ever talks to one address.",
+      "why": "The cookie stays first-party, there is no CORS configuration to get wrong, and the API can stay on a private network. The proxy passes the answer on as it arrives: measured first word after 29 ms through the proxy against 26 ms direct, for an answer that takes 1.7 seconds.",
+      "alternatives": [
+        {
+          "option": "The browser calls the API on another domain",
+          "why_not": "It needs CORS with credentials and cross-site cookies, which browsers restrict more every year."
+        },
+        {
+          "option": "Next.js rewrites in the configuration file",
+          "why_not": "Less code, but less control over which headers pass and over cancelling the upstream request when the user presses Stop."
+        },
+        {
+          "option": "Everything in Next.js, no Python",
+          "why_not": "Possible for a simple chat, but AI work beyond a chat call (retrieval, evaluation, data pipelines) is done in Python."
+        }
+      ],
+      "at_scale": "A reverse proxy such as Nginx or the hosting platform does the same job in front of both services. Buffering must be switched off for the streaming route."
+    },
+    {
+      "title": "How the answer is streamed",
+      "chosen": "Server-Sent Events over a normal POST request, read in the browser with fetch.",
+      "why": "A chat answer flows one way, from server to browser. SSE is plain HTTP, passes through proxies, and needs no extra server. The browser's built-in EventSource cannot send a POST, so the stream is read with fetch and a 30-line parser that is unit tested.",
+      "alternatives": [
+        {
+          "option": "WebSockets",
+          "why_not": "Two-way and more to operate (connection state, load balancer support) for something that only flows one way."
+        },
+        {
+          "option": "Wait and send the whole answer",
+          "why_not": "The user stares at a spinner for the whole generation time. With a local model in the live check that was 11 seconds, against under 4 seconds to the first word."
+        },
+        {
+          "option": "The Vercel AI SDK",
+          "why_not": "A good library, but it hides the protocol. Here the point is to show how it works, and the backend is Python."
+        }
+      ],
+      "at_scale": "Same design. Add a heartbeat comment every few seconds so idle proxies do not close slow streams, and a per-user cap on simultaneous streams."
+    },
+    {
+      "title": "What happens when the user stops an answer or the provider fails",
+      "chosen": "A stopped answer is saved as it is and counted. A provider failure with no output is not counted. A failure after some output keeps the text and counts it.",
+      "why": "The rule is simple to explain to a customer: you pay for what was produced. It also matches the provider's bill, because tokens produced before a stop are charged.",
+      "alternatives": [
+        {
+          "option": "Never count stopped or failed requests",
+          "why_not": "A user could read most of every answer and press Stop just before the end, for free."
+        },
+        {
+          "option": "Always count every request",
+          "why_not": "Users would pay for the provider's outages."
+        }
+      ],
+      "at_scale": "The same rule, plus automatic retry on another provider before reporting a failure."
+    },
+    {
+      "title": "Which database",
+      "chosen": "SQLite through SQLAlchemy, in WAL mode.",
+      "why": "The project must run for a stranger with one command and no database server. SQLAlchemy keeps the models and queries portable.",
+      "alternatives": [
+        {
+          "option": "PostgreSQL in Docker",
+          "why_not": "The right production choice, but it adds Docker as a requirement just to look at the demo."
+        },
+        {
+          "option": "Supabase",
+          "why_not": "Needs an account and keys, and moves the access rules out of the code where a client can read them."
+        }
+      ],
+      "at_scale": "PostgreSQL with migrations (Alembic) and a row lock per user. This change is not done or tested in this project."
+    },
+    {
+      "title": "How to talk to model providers",
+      "chosen": "One small interface with three implementations: an offline mock, and one class that speaks the OpenAI chat protocol over HTTP for OpenAI, Ollama and similar servers.",
+      "why": "The rest of the app does not know which model answers. Tests run offline and give the same result every time. Moving to a local model for privacy or cost is one setting.",
+      "alternatives": [
+        {
+          "option": "The OpenAI SDK",
+          "why_not": "One more dependency whose versions change often; the protocol itself is stable and small."
+        },
+        {
+          "option": "LangChain or LiteLLM",
+          "why_not": "Useful with many providers and tools. For one chat call it adds layers a client then has to maintain."
+        }
+      ],
+      "at_scale": "A gateway such as LiteLLM in front, with fallback between providers and per-model budgets."
+    }
+  ],
+  "results": [
+    {
+      "metric": "API tests",
+      "value": "37 passed, offline, in about 6 seconds",
+      "how": "cd backend && .venv/bin/python -m pytest -q"
+    },
+    {
+      "metric": "Front-end unit tests",
+      "value": "5 passed",
+      "how": "cd frontend && npm test"
+    },
+    {
+      "metric": "Browser test of the whole product",
+      "value": "9 of 9 steps passed (also in a clean clone)",
+      "how": "backend/.venv/bin/python scripts/e2e.py --web http://localhost:3023"
+    },
+    {
+      "metric": "50 requests at once against a limit of 20",
+      "value": "exactly 20 served and 30 refused",
+      "how": "cd backend && .venv/bin/python -m pytest tests/test_quota.py -k parallel"
+    },
+    {
+      "metric": "Time to first word, direct to the API (offline provider, 20 ms per word)",
+      "value": "median 26 ms; whole answer 1732 ms",
+      "how": "backend/.venv/bin/python scripts/bench_stream.py"
+    },
+    {
+      "metric": "Time to first word through the Next.js proxy",
+      "value": "median 29 ms; whole answer 1734 ms",
+      "how": "backend/.venv/bin/python scripts/bench_stream.py --web http://localhost:3023"
+    },
+    {
+      "metric": "100 streams at once on one API process",
+      "value": "all completed in 2.76 s; first word p50 420 ms, p95 847 ms",
+      "how": "backend/.venv/bin/python scripts/bench_stream.py"
+    },
+    {
+      "metric": "Live request with a real model (llama3.2 3B on CPU through Ollama)",
+      "value": "passed; first word 3.79 s, whole answer 11.41 s, 91 input and 74 output tokens reported by the provider and recorded",
+      "how": "OPENAI_BASE_URL=http://127.0.0.1:11434/v1 OPENAI_MODEL=llama3.2-cpu:latest backend/.venv/bin/python scripts/live_check.py"
+    }
+  ],
+  "client_qa": [
+    {
+      "q": "Can one heavy user run up my model bill?",
+      "a": "No. Each plan has a daily message limit, a daily token limit, a per-minute limit and a cap on answer length, all enforced on the server before the model is called. I tested the hard case, 50 requests sent at the same moment with 20 slots left: exactly 20 went through."
+    },
+    {
+      "q": "How will I know what each customer costs me?",
+      "a": "Every request writes a usage record with the model, input tokens, output tokens and an estimated cost. The admin page adds them up per day and per account, sorted by cost. The cost is an estimate from a price table that you keep up to date, so check it against the provider's invoice."
+    },
+    {
+      "q": "Can you add Stripe so customers pay and upgrade by themselves?",
+      "a": "Yes, and the app is prepared for it: the plan is one field on the user and the limits follow it at once. Stripe Checkout plus a webhook that sets that field is the missing part. It is not in this project, where an administrator changes the plan."
+    },
+    {
+      "q": "Is my customers' data safe from other customers?",
+      "a": "Every query for conversations filters on the signed-in user, and a test checks that a second user cannot list, read, rename, delete or write to the first user's conversation. They get a 'not found' answer, so they cannot even learn that it exists."
+    },
+    {
+      "q": "How long would it take to turn this into my product?",
+      "a": "The plumbing is done: accounts, limits, streaming, history, admin. Your product is mostly the prompt, the screens and your business rules. What must be added before real customers is listed under limits: payments, email verification and password reset, PostgreSQL, and deployment."
+    },
+    {
+      "q": "Do I have to use OpenAI?",
+      "a": "No. The app talks to models through one small interface. I ran it against a local open model through Ollama with no code change, only two settings. Any server that speaks the OpenAI chat protocol works the same way."
+    },
+    {
+      "q": "This is a demo on SQLite. Why should I believe it works at real scale?",
+      "a": "You should not take scale on trust, and I do not claim it. What I measured: 100 answers streaming at once on one process, all completed, with a median wait of 420 ms for the first word. That wait is SQLite's single write lock. For real traffic the database becomes PostgreSQL with a lock per user, which I describe but did not build here."
+    },
+    {
+      "q": "What happens when a user closes the tab in the middle of an answer?",
+      "a": "The cancel travels from the browser through the web server to the API, which stops reading from the model, saves the partial answer and records the tokens that were produced. A test does this against a real server, and the browser test presses Stop and finds the partial answer in the history after a reload."
+    },
+    {
+      "q": "What happens when the model provider is down?",
+      "a": "The user sees a clear message instead of a spinner, and the request is not counted against their limit when nothing was produced. The technical error goes to the server log, not to the user. Failed requests are counted on the admin page."
+    },
+    {
+      "q": "How are passwords and sessions stored?",
+      "a": "Passwords are hashed with scrypt and a random salt for each one. The session is a random token in a cookie that page scripts cannot read; the database keeps only a hash of it. Signing out or deactivating an account deletes the session, so a copied cookie stops working. Five wrong passwords lock the email for 15 minutes."
+    },
+    {
+      "q": "Why two servers? Could Next.js do everything?",
+      "a": "For a simple chat, yes. I keep the AI side in Python because that is where retrieval, evaluation and data tools are, and most AI features grow in that direction. The browser still sees one address, because the Next.js server forwards API calls."
+    },
+    {
+      "q": "Does the admin page show real data?",
+      "a": "On a fresh install it shows two weeks of synthetic usage created by a seed script, so there is something to look at. Everything you do in the app is added to it for real. The synthetic history is priced as if it ran on gpt-4o-mini; it is not a measurement."
+    }
+  ],
+  "concepts": [
+    {
+      "term": "SaaS",
+      "plain": "Software sold as a subscription and used in a browser. Customers have accounts and plans instead of installing anything."
+    },
+    {
+      "term": "Server-Sent Events (SSE)",
+      "plain": "A way for a server to send a browser many small messages over one normal web request. Here each message carries the next few characters of the answer."
+    },
+    {
+      "term": "Streaming",
+      "plain": "Showing the answer as it is produced, instead of waiting for all of it. The total time is the same, but the user starts reading almost at once."
+    },
+    {
+      "term": "Token",
+      "plain": "The unit a language model reads and writes, roughly three quarters of an English word. Providers charge per token, separately for input and output."
+    },
+    {
+      "term": "Quota",
+      "plain": "The amount a user may consume in a period, here messages and tokens per day. It protects the owner's model budget."
+    },
+    {
+      "term": "Rate limit (burst limit)",
+      "plain": "A cap on how many requests may come in a short time, here per minute. It stops scripts and accidents, where a daily quota alone would allow all of it in one second."
+    },
+    {
+      "term": "Race condition",
+      "plain": "A bug that only appears when two things happen at the same time, such as two requests both seeing one free slot. It is fixed by making 'check and record' a single step."
+    },
+    {
+      "term": "Database transaction and write lock",
+      "plain": "A transaction is a group of database steps that succeed or fail together. A write lock makes others wait until it is finished, so nobody acts on numbers that are about to change."
+    },
+    {
+      "term": "Session cookie",
+      "plain": "A small value the browser stores after sign-in and sends with each request, so the server knows who is asking. 'httpOnly' means scripts in the page cannot read it."
+    },
+    {
+      "term": "Password hashing (scrypt)",
+      "plain": "Storing a one-way scramble of the password instead of the password. scrypt is slow and memory-hungry on purpose, so guessing millions of passwords is expensive."
+    },
+    {
+      "term": "JWT",
+      "plain": "A signed token that carries the user's identity inside it. It is easy to check but hard to cancel early, which is why this project uses server-side sessions instead."
+    },
+    {
+      "term": "CSRF",
+      "plain": "An attack where another website makes your browser send a request to a site you are signed in to. The SameSite cookie setting stops the browser from attaching the cookie to such requests."
+    },
+    {
+      "term": "CORS",
+      "plain": "Browser rules for a page on one address calling an API on another. This project avoids the topic by serving everything from one address."
+    },
+    {
+      "term": "Proxy / backend for frontend",
+      "plain": "A server that receives the browser's request and passes it to another server. Here the Next.js server passes API calls to the Python API."
+    },
+    {
+      "term": "Next.js App Router",
+      "plain": "The current way to build pages in Next.js, where a page can run code on the server before it is sent. Here that code checks the session, so signed-out visitors never receive the app."
+    },
+    {
+      "term": "FastAPI",
+      "plain": "A Python framework for building web APIs. It checks incoming data against declared shapes and supports streaming responses."
+    },
+    {
+      "term": "ORM (SQLAlchemy)",
+      "plain": "A library that lets code work with database rows as objects. It makes it possible to move from SQLite to PostgreSQL with few changes."
+    },
+    {
+      "term": "Mock provider",
+      "plain": "A stand-in for the language model that answers from templates. It makes the app and its tests run with no key, no cost and the same result every time."
+    },
+    {
+      "term": "OpenAI-compatible API",
+      "plain": "Many model servers, including Ollama, accept the same request format as OpenAI. Code written for that format can switch between them with a setting."
+    },
+    {
+      "term": "Time to first token",
+      "plain": "How long the user waits before the first word appears. It matters more to the feeling of speed than the total time."
+    },
+    {
+      "term": "p50 and p95",
+      "plain": "p50 is the typical case: half of the requests were faster. p95 is the slow case: only 5 in 100 were slower."
+    },
+    {
+      "term": "End-to-end test",
+      "plain": "A test that drives a real browser through the product like a user would. It catches problems that tests of single parts cannot see."
+    }
+  ],
+  "limits": [
+    "No payments: there is no Stripe or other checkout. An administrator changes the plan of an account. 'Plan revenue' on the admin page is list price times accounts, not money received.",
+    "No email: no address verification and no password reset.",
+    "SQLite and one API process. Reservations wait on a single write lock, which is the 420 ms median seen with 100 streams at once. PostgreSQL with a lock per user is described but not built or tested, and there are no database migrations.",
+    "The OpenAI path was not run against OpenAI because the key was empty in this build. It is covered by tests with a simulated HTTP server and by a live run against a local model through Ollama, which uses the same code.",
+    "Cost is an estimate from token counts and a price table in the code. The prices are configuration and were not checked against a provider invoice.",
+    "Token counts come from the provider when it reports them. The offline provider counts about four characters per token.",
+    "A user can pass the daily token limit by one answer, because tokens are only known when the answer ends. The cap on answer length bounds this.",
+    "CSRF protection is the SameSite=Lax cookie only. Login lock-out is per email, not per IP address.",
+    "The offline provider is not a language model: it fills a template chosen by keywords.",
+    "Answers are shown as plain text, without Markdown rendering. There is no file upload, no dark mode, and the history sidebar is hidden on narrow phone screens.",
+    "The demo accounts have known passwords and the admin page starts with synthetic usage from the seed script.",
+    "Not included: Docker files, CI, an audit log of admin actions, teams or organisations, social sign-in."
+  ],
+  "run": [
+    "./dev.sh",
+    "open http://localhost:3000 and sign in as demo@example.com / demo-demo-1 (user) or admin@example.com / admin-demo-1 (administrator)",
+    "cd backend && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/python -m pytest -q",
+    "cd frontend && npm test",
+    "backend/.venv/bin/python scripts/bench_stream.py --web http://localhost:3000",
+    "OPENAI_BASE_URL=http://127.0.0.1:11434/v1 OPENAI_MODEL=llama3.2 backend/.venv/bin/python scripts/live_check.py"
+  ],
+  "files": [
+    {
+      "path": "dev.sh",
+      "what": "One command that installs both parts, creates the demo data and starts the API and the web app."
+    },
+    {
+      "path": "backend/app/routers/chat.py",
+      "what": "The streaming endpoint: prepare (sign-in check, quota, save the question), stream, finalise (save the answer and the tokens)."
+    },
+    {
+      "path": "backend/app/quota.py",
+      "what": "The limits: counts today's usage and reserves a slot by writing a usage record."
+    },
+    {
+      "path": "backend/app/db.py",
+      "what": "Database sessions, and the write lock that makes the quota check safe under parallel requests."
+    },
+    {
+      "path": "backend/app/models.py",
+      "what": "The tables: users, sessions, conversations, messages, usage events, login attempts."
+    },
+    {
+      "path": "backend/app/security.py",
+      "what": "Password hashing with scrypt and session tokens."
+    },
+    {
+      "path": "backend/app/routers/auth.py",
+      "what": "Register, sign in, sign out, current user, and the lock after repeated wrong passwords."
+    },
+    {
+      "path": "backend/app/routers/conversations.py",
+      "what": "Saved history: list, read, rename and delete, always filtered on the owner."
+    },
+    {
+      "path": "backend/app/routers/admin.py",
+      "what": "The admin overview, the per-account table, plan change and deactivation."
+    },
+    {
+      "path": "backend/app/routers/account.py",
+      "what": "The user's own usage, the public plan list and account deletion."
+    },
+    {
+      "path": "backend/app/plans.py",
+      "what": "The plans with their limits, and the model price table used for cost estimates."
+    },
+    {
+      "path": "backend/app/llm/",
+      "what": "The provider interface, the offline mock and the OpenAI-compatible provider."
+    },
+    {
+      "path": "backend/app/seed.py",
+      "what": "Creates the demo accounts and two weeks of synthetic usage."
+    },
+    {
+      "path": "backend/tests/",
+      "what": "37 tests: accounts, streaming, limits, the parallel race, privacy, failures, disconnects, admin."
+    },
+    {
+      "path": "frontend/app/api/[...path]/route.ts",
+      "what": "The proxy that forwards browser calls to the API and passes the stream through."
+    },
+    {
+      "path": "frontend/components/ChatWorkspace.tsx",
+      "what": "The chat screen: history sidebar, streamed messages, stop button, limit notices."
+    },
+    {
+      "path": "frontend/components/AdminDashboard.tsx",
+      "what": "The admin screen: totals, usage chart and the account table."
+    },
+    {
+      "path": "frontend/components/UsageChart.tsx",
+      "what": "The bar chart of daily usage, drawn in SVG with no chart library."
+    },
+    {
+      "path": "frontend/lib/sse.ts",
+      "what": "The parser that turns the incoming byte stream into events, with unit tests."
+    },
+    {
+      "path": "frontend/lib/server.ts",
+      "what": "Server-side check of who the visitor is, used to protect pages."
+    },
+    {
+      "path": "scripts/bench_stream.py",
+      "what": "Measures time to first word and behaviour with 100 streams at once."
+    },
+    {
+      "path": "scripts/live_check.py",
+      "what": "Sends one real request through the whole API to a real model and prints tokens and cost."
+    },
+    {
+      "path": "scripts/e2e.py",
+      "what": "The browser test of the whole product; it also takes the screenshots in docs/."
+    }
+  ],
   "verification": {
-    "tests": "",
+    "tests": "Backend: 37 passed (cd backend && .venv/bin/python -m pytest -q), offline, no key. Front end: 5 passed (npm test), type check and lint clean. Browser test: 9 of 9 steps passed (scripts/e2e.py), in the project folder and again in a clean clone started with ./dev.sh.",
     "live_llm": "pending",
     "cost_usd": 0,
-    "notes": ""
+    "notes": "OPENAI_API_KEY in /var/www/AB/github-projects/.env is empty, so the check against OpenAI itself could not run and stays pending. The real-model path was checked instead against a local model: scripts/live_check.py with llama3.2 (3B, CPU) through Ollama's OpenAI-compatible API passed, with the first word after 3.79 s, the whole answer after 11.41 s, and 91 input and 74 output tokens reported by the provider and recorded in the usage table. Cost 0 USD. To finish the OpenAI check, put a key in .env and run: OPENAI_API_KEY=... backend/.venv/bin/python scripts/live_check.py. During the build the quota write lock was removed once on purpose; the parallel-request test then failed, which confirms the test really checks the lock. Docker was left out to keep the scope to what could be verified."
   }
 }
