@@ -1,0 +1,232 @@
+{
+  "id": 23,
+  "slug": "ai-saas-starter",
+  "repo": "ai-saas-starter-nextjs",
+  "title": "Full-stack AI SaaS app (Next.js + FastAPI)",
+  "tagline": "A small but complete AI product: sign-in, per-user usage limits, streamed answers, saved history and an admin usage page, with a Next.js front end and a Python API.",
+  "category": "Full-stack AI",
+  "status": "building",
+  "started": "2026-10-13",
+  "finished": "",
+  "pitch": "I built a complete AI product, not just a chat box. People sign up, each plan has a daily limit that the server enforces, answers appear word by word, every conversation is saved, and the owner has a page that shows who used what and what it cost. It runs on your laptop with one command and no API key, and the same code talks to OpenAI or a local model by changing one setting.",
+  "problem": "A founder who wants to sell an AI feature needs much more than a call to a model. Without accounts, usage limits and cost tracking, one heavy user can spend the whole month's model budget in a day, and nobody can say which customers are profitable. Most demos skip exactly these parts.",
+  "solution": "Shopdesk AI is a writing assistant for small online shops, used here as the example product. A Next.js web app talks to a FastAPI server. The server keeps accounts, sessions, conversations and one usage record per request in a database. Before a request reaches the model the server reserves a place in the user's daily allowance, then it streams the answer to the browser and records the tokens and the estimated cost. An admin page reads the same usage records.",
+  "features": [
+    "Sign-up, sign-in and sign-out with hashed passwords and server-side sessions in an httpOnly cookie",
+    "Plans (free and pro) with a daily message limit, a daily token limit and a per-minute burst limit, enforced on the server",
+    "Answers streamed word by word with Server-Sent Events, with a stop button that keeps the partial answer",
+    "Saved conversation history per user: list, open, rename and delete",
+    "A usage meter for the user and an admin page with daily usage, cost estimate and per-user controls",
+    "Three model providers behind one interface: an offline mock, OpenAI, and any OpenAI-compatible server such as Ollama"
+  ],
+  "stack": [
+    {
+      "name": "Next.js (App Router) + TypeScript",
+      "role": "The web app: landing page, sign-in, chat workspace, account page and admin page.",
+      "why": "It is the front-end framework most SaaS clients ask for, and its server side can check the session before a page is sent."
+    },
+    {
+      "name": "FastAPI",
+      "role": "The API: accounts, quota, streaming, history and admin data.",
+      "why": "The AI ecosystem is in Python, and FastAPI streams responses and validates input with little code."
+    },
+    {
+      "name": "SQLite + SQLAlchemy",
+      "role": "Stores users, sessions, conversations, messages and usage records.",
+      "why": "A stranger can run it with no database server, and SQLAlchemy lets the same models run on PostgreSQL later."
+    },
+    {
+      "name": "Server-Sent Events",
+      "role": "Carries the answer from the server to the browser piece by piece.",
+      "why": "It is one-way streaming over normal HTTP, which is all a chat answer needs, and it is simpler than WebSockets."
+    },
+    {
+      "name": "Tailwind CSS",
+      "role": "Styles the pages.",
+      "why": "It is the styling tool most Next.js clients already use."
+    }
+  ],
+  "keywords": [],
+  "topics": [],
+  "workflow": [
+    {
+      "step": "Sign in",
+      "detail": "The browser sends the email and password to the API through the Next.js server. The API checks the password hash, stores a session and sets an httpOnly cookie."
+    },
+    {
+      "step": "Send a message",
+      "detail": "The browser posts the message. The API finds the user from the cookie and loads the limits of the user's plan."
+    },
+    {
+      "step": "Reserve quota",
+      "detail": "In one database transaction the API counts today's usage and, if there is room, writes a usage record with the state started. If not, it answers 429 with the reset time."
+    },
+    {
+      "step": "Stream the answer",
+      "detail": "The API sends the recent conversation to the model provider and forwards each piece of the answer to the browser as a Server-Sent Event."
+    },
+    {
+      "step": "Record",
+      "detail": "When the stream ends or the user stops it, the API saves the answer, and fills the usage record with input tokens, output tokens and estimated cost."
+    },
+    {
+      "step": "Report",
+      "detail": "The user's meter and the admin page are computed from the usage records, so they always agree with what was enforced."
+    }
+  ],
+  "phases": [
+    {
+      "name": "Foundation",
+      "goal": "A runnable API skeleton with the database, accounts and sessions.",
+      "status": "done",
+      "steps": [
+        {
+          "text": "Create the repository skeleton, configuration, .gitignore, .env.example and license",
+          "done": true
+        },
+        {
+          "text": "Define the database tables: users, sessions, conversations, messages, usage events, login attempts",
+          "done": true
+        },
+        {
+          "text": "Implement password hashing and server-side sessions in an httpOnly cookie",
+          "done": true
+        },
+        {
+          "text": "Implement register, login, logout and current-user endpoints",
+          "done": true
+        },
+        {
+          "text": "Write tests for the account flow and run them",
+          "done": true
+        }
+      ],
+      "outcome": "The API starts, creates its SQLite database, and supports register, login, logout and current user. Passwords are stored as scrypt hashes and sessions as hashed tokens. 8 account tests pass."
+    },
+    {
+      "name": "Core: quota, streaming and history",
+      "goal": "A signed-in user can send a message, receive a streamed answer on the mock provider, and find it in the history, within the plan limits.",
+      "status": "doing",
+      "steps": [
+        {
+          "text": "Write the provider interface with the offline mock and the OpenAI-compatible provider",
+          "done": false
+        },
+        {
+          "text": "Implement quota reservation in one transaction, with daily message, daily token and burst limits",
+          "done": false
+        },
+        {
+          "text": "Implement the streaming chat endpoint with Server-Sent Events and partial-answer saving on disconnect",
+          "done": false
+        },
+        {
+          "text": "Implement conversation list, read, rename and delete, scoped to the owner",
+          "done": false
+        },
+        {
+          "text": "Write tests for streaming, quota, the concurrency race and data isolation, and run them",
+          "done": false
+        }
+      ],
+      "outcome": ""
+    },
+    {
+      "name": "Admin and account",
+      "goal": "The owner can see usage and cost and change a user's plan; a user can see their own usage and delete the account.",
+      "status": "todo",
+      "steps": [
+        {
+          "text": "Implement the account usage endpoint and account deletion",
+          "done": false
+        },
+        {
+          "text": "Implement the admin overview, the user list and the plan and status change",
+          "done": false
+        },
+        {
+          "text": "Write the seed script that creates demo users with synthetic usage history",
+          "done": false
+        },
+        {
+          "text": "Write tests for admin access control and the usage numbers, and run them",
+          "done": false
+        }
+      ],
+      "outcome": ""
+    },
+    {
+      "name": "Web app",
+      "goal": "A Next.js front end for every flow, started together with the API by one command.",
+      "status": "todo",
+      "steps": [
+        {
+          "text": "Create the Next.js app and the streaming proxy route to the API",
+          "done": false
+        },
+        {
+          "text": "Build the landing page and the sign-in and sign-up pages",
+          "done": false
+        },
+        {
+          "text": "Build the chat workspace: history sidebar, streamed messages, stop button, usage meter",
+          "done": false
+        },
+        {
+          "text": "Build the account page and the admin page with the usage chart",
+          "done": false
+        },
+        {
+          "text": "Write the one-command start script and unit tests for the stream parser",
+          "done": false
+        },
+        {
+          "text": "Run a browser test of the whole flow and take screenshots",
+          "done": false
+        }
+      ],
+      "outcome": ""
+    },
+    {
+      "name": "Verification and docs",
+      "goal": "Measured results, a live model check, and documentation a client can follow.",
+      "status": "todo",
+      "steps": [
+        {
+          "text": "Run the full test suite offline and record the result",
+          "done": false
+        },
+        {
+          "text": "Run the streaming benchmark, directly and through the Next.js proxy",
+          "done": false
+        },
+        {
+          "text": "Run the live check against a real model and record the cost",
+          "done": false
+        },
+        {
+          "text": "Run the project from a clean clone the way the README says",
+          "done": false
+        },
+        {
+          "text": "Write the README and complete the dashboard entry",
+          "done": false
+        }
+      ],
+      "outcome": ""
+    }
+  ],
+  "decisions": [],
+  "results": [],
+  "client_qa": [],
+  "concepts": [],
+  "limits": [],
+  "run": [],
+  "files": [],
+  "verification": {
+    "tests": "",
+    "live_llm": "pending",
+    "cost_usd": 0,
+    "notes": ""
+  }
+}
