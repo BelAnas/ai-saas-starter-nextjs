@@ -106,59 +106,59 @@
     {
       "name": "Core: quota, streaming and history",
       "goal": "A signed-in user can send a message, receive a streamed answer on the mock provider, and find it in the history, within the plan limits.",
-      "status": "doing",
+      "status": "done",
       "steps": [
         {
           "text": "Write the provider interface with the offline mock and the OpenAI-compatible provider",
-          "done": false
+          "done": true
         },
         {
           "text": "Implement quota reservation in one transaction, with daily message, daily token and burst limits",
-          "done": false
+          "done": true
         },
         {
           "text": "Implement the streaming chat endpoint with Server-Sent Events and partial-answer saving on disconnect",
-          "done": false
+          "done": true
         },
         {
           "text": "Implement conversation list, read, rename and delete, scoped to the owner",
-          "done": false
+          "done": true
         },
         {
           "text": "Write tests for streaming, quota, the concurrency race and data isolation, and run them",
-          "done": false
+          "done": true
         }
       ],
-      "outcome": ""
+      "outcome": "A signed-in user can send a message and receive a streamed answer from the offline provider, inside daily message, daily token and burst limits. Conversations are saved and private to their owner. A test fires 50 requests at once against a limit of 20 and exactly 20 are served. Closing the connection keeps the partial answer."
     },
     {
       "name": "Admin and account",
       "goal": "The owner can see usage and cost and change a user's plan; a user can see their own usage and delete the account.",
-      "status": "todo",
+      "status": "done",
       "steps": [
         {
           "text": "Implement the account usage endpoint and account deletion",
-          "done": false
+          "done": true
         },
         {
           "text": "Implement the admin overview, the user list and the plan and status change",
-          "done": false
+          "done": true
         },
         {
           "text": "Write the seed script that creates demo users with synthetic usage history",
-          "done": false
+          "done": true
         },
         {
           "text": "Write tests for admin access control and the usage numbers, and run them",
-          "done": false
+          "done": true
         }
       ],
-      "outcome": ""
+      "outcome": "The account usage endpoint, account deletion, the admin overview, the admin user table with plan and status changes, and a seed script with synthetic usage exist. 37 tests pass."
     },
     {
       "name": "Web app",
       "goal": "A Next.js front end for every flow, started together with the API by one command.",
-      "status": "todo",
+      "status": "doing",
       "steps": [
         {
           "text": "Create the Next.js app and the streaming proxy route to the API",
